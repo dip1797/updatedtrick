@@ -1,0 +1,1519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Kachuful Scorekeeper</title>
+
+  <!-- Optional live sync. Snapshot/local scorekeeping works without Firebase. -->
+  <!-- <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script> -->
+  <!-- <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script> -->
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Anton&family=Nunito+Sans:wght@400;600;700;800;900&display=swap');
+
+    :root {
+      color-scheme: light;
+      --felt: #111827;
+      --felt2: #020617;
+      --gold: #fbbf24;
+      --accent-main: #7c3aed;
+      --accent-dark-main: #1e1b4b;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --paper: #ffffff;
+      --line: rgba(15,23,42,.12);
+      --nav-h: 76px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      font-family: "Nunito Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 0% 0%, rgba(124,58,237,.22), transparent 36rem),
+        radial-gradient(circle at 100% 0%, rgba(251,191,36,.18), transparent 30rem),
+        linear-gradient(140deg, #f8fafc 0%, #eef2ff 52%, #fff7ed 100%);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    button, input, textarea, select { font: inherit; }
+    button { border: 0; cursor: pointer; touch-action: manipulation; }
+    input, textarea { min-width: 0; }
+
+    .safe-top { padding-top: calc(14px + env(safe-area-inset-top)); }
+    .safe-bottom { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+    .page { min-height: 100vh; padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 20px); }
+    .no-nav { padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
+    .wrap { width: min(1180px, calc(100% - 24px)); margin: 0 auto; }
+
+    .felt {
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 12% 10%, rgba(168,85,247,.30), transparent 15rem),
+        radial-gradient(circle at 90% 0%, rgba(251,191,36,.26), transparent 20rem),
+        radial-gradient(circle at 75% 85%, rgba(14,165,233,.18), transparent 18rem),
+        linear-gradient(135deg, #0f172a, #1e1b4b 56%, #020617);
+      color: white;
+    }
+    .felt:before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.045) 1px, transparent 1px);
+      background-size: 18px 18px;
+      opacity: .8;
+      pointer-events: none;
+    }
+    .felt:after {
+      content: "♠  ♦  ♣  ♥";
+      position: absolute;
+      right: -1.4rem;
+      bottom: -.9rem;
+      font-weight: 900;
+      letter-spacing: .16em;
+      font-size: clamp(3.6rem, 13vw, 8rem);
+      color: rgba(255,255,255,.06);
+      pointer-events: none;
+      transform: rotate(-5deg);
+    }
+    .on-felt { position: relative; z-index: 1; }
+
+    .glass {
+      background: rgba(255,255,255,.88);
+      border: 1px solid rgba(255,255,255,.72);
+      backdrop-filter: blur(18px);
+      box-shadow: 0 20px 55px rgba(15,23,42,.10);
+    }
+    .card {
+      background: rgba(255,255,255,.96);
+      border: 1px solid rgba(15,23,42,.08);
+      box-shadow: 0 14px 38px rgba(15,23,42,.08);
+    }
+    .mini-card {
+      background: white;
+      border: 1px solid rgba(15,23,42,.08);
+      box-shadow: 0 8px 20px rgba(15,23,42,.07);
+    }
+
+    .hero { border-radius: 0 0 30px 30px; padding: 14px 0 78px; box-shadow: 0 18px 50px rgba(30,27,75,.24); }
+    .hero-row { display: flex; gap: 14px; align-items: flex-start; justify-content: space-between; }
+    .hero h1 { margin: 6px 0 0; font-family: "Anton", "Nunito Sans", sans-serif; font-size: clamp(2.7rem, 11vw, 6.5rem); line-height: .92; letter-spacing: .01em; font-weight: 400; text-transform: uppercase; }
+    .brand-title { margin: 12px 0 0; font-family: "Anton", "Nunito Sans", sans-serif; font-size: clamp(3.3rem, 17vw, 8.5rem); line-height: .9; letter-spacing: .015em; font-weight: 400; text-transform: uppercase; white-space: nowrap; }
+    .eyebrow { margin: 0; color: rgba(255,255,255,.72); font-size: .68rem; letter-spacing: .22em; text-transform: uppercase; font-weight: 900; }
+    .hero-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .hero-btn { color: white; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18); border-radius: 16px; padding: 10px 12px; font-size: .72rem; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; }
+    .hero-btn:active { transform: scale(.98); }
+
+    .pull-up { margin-top: -56px; position: relative; z-index: 2; }
+    .section-title { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin: 0 0 14px; }
+    .section-title h2 { margin: 0; font-size: 1.55rem; line-height: 1; letter-spacing: -.04em; font-weight: 900; }
+    .section-title p { margin: 0; font-size: .72rem; color: var(--muted); font-weight: 800; text-transform: uppercase; letter-spacing: .12em; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border-radius: 20px;
+      padding: 14px 16px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      transition: transform .12s ease, filter .12s ease, opacity .12s ease;
+      min-height: 48px;
+      text-decoration: none;
+    }
+    .btn:active { transform: scale(.98); }
+    .btn-primary { color: white; background: linear-gradient(135deg, #7c3aed, #1e1b4b); box-shadow: 0 16px 32px rgba(76,29,149,.25); }
+    .btn-gold { color: white; background: linear-gradient(135deg, #f59e0b, #d97706); box-shadow: 0 16px 32px rgba(217,119,6,.22); }
+    .btn-dark { color: white; background: #0f172a; box-shadow: 0 16px 32px rgba(15,23,42,.20); }
+    .btn-light { color: #0f172a; background: white; border: 1px solid rgba(15,23,42,.10); box-shadow: 0 8px 20px rgba(15,23,42,.07); }
+    .btn-red { color: white; background: linear-gradient(135deg, #ef4444, #991b1b); }
+    .btn-full { width: 100%; }
+    .btn[disabled] { opacity: .45; cursor: not-allowed; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    .grid-4 { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    @media (min-width: 760px) {
+      .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .hero { border-radius: 0 0 44px 44px; padding-bottom: 94px; }
+      .pull-up { margin-top: -70px; }
+    }
+
+    .choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    @media (min-width: 900px) { .choice-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    .choice {
+      border-radius: 20px;
+      padding: 14px;
+      text-align: left;
+      background: white;
+      color: #0f172a;
+      border: 1px solid rgba(15,23,42,.10);
+      box-shadow: 0 8px 18px rgba(15,23,42,.05);
+    }
+    .choice strong { display: block; font-size: .98rem; line-height: 1.05; }
+    .choice span { display: block; margin-top: 5px; color: #64748b; font-size: .75rem; font-weight: 800; line-height: 1.25; }
+    .choice.active { background: #312e81; color: white; border-color: #312e81; box-shadow: 0 14px 30px rgba(49,46,129,.22); }
+    .choice.active span { color: rgba(255,255,255,.74); }
+    .choice.clean strong, .choice-grid.three .choice strong { text-align: center; font-size: 1.02rem; }
+    .clean-help { font-size: .72rem; opacity: .9; }
+
+    .setup-card { border-radius: 28px; padding: 16px; }
+    .field-label { display: block; margin: 0 0 10px; color: #64748b; font-size: .68rem; font-weight: 900; text-transform: uppercase; letter-spacing: .18em; }
+    .help { margin: 8px 0 0; color: #64748b; font-size: .78rem; font-weight: 700; line-height: 1.35; }
+    .input {
+      width: 100%;
+      border: 1px solid rgba(15,23,42,.12);
+      background: #f8fafc;
+      border-radius: 18px;
+      padding: 14px 14px;
+      outline: none;
+      font-weight: 900;
+      color: #0f172a;
+    }
+    .textarea { min-height: 88px; resize: vertical; }
+
+    .stepper { display: grid; grid-template-columns: 44px minmax(48px,1fr) 44px; align-items: center; gap: 8px; }
+    .stepper.small { grid-template-columns: 40px minmax(40px,1fr) 40px; gap: 6px; }
+    .step-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 16px;
+      background: #f1f5f9;
+      color: #0f172a;
+      font-size: 1.6rem;
+      font-weight: 900;
+      line-height: 1;
+      box-shadow: inset 0 -2px 0 rgba(15,23,42,.05);
+    }
+    .stepper.small .step-btn { width: 40px; height: 40px; border-radius: 14px; font-size: 1.35rem; }
+    .step-value { text-align: center; font-size: 2.25rem; font-weight: 900; letter-spacing: -.06em; line-height: 1; font-variant-numeric: tabular-nums; }
+    .stepper.small .step-value { font-size: 1.85rem; }
+
+    .preview { display: flex; flex-wrap: wrap; gap: 6px; }
+    .preview span { border-radius: 999px; background: #eef2ff; color: #3730a3; border: 1px solid #c7d2fe; padding: 7px 10px; font-size: .78rem; font-weight: 900; }
+    .preview .more { background: #f1f5f9; color: #64748b; border-color: #e2e8f0; }
+
+    .name-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+    @media (min-width: 760px) { .name-grid { grid-template-columns: repeat(3, minmax(0,1fr)); } }
+    .name-field {
+      --accent: #7c3aed;
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      border-radius: 18px;
+      padding: 9px;
+      background: white;
+      border: 1px solid rgba(15,23,42,.10);
+      box-shadow: 0 8px 18px rgba(15,23,42,.05);
+    }
+    .name-main { min-width: 0; flex: 1; }
+    .name-num { width: 38px; height: 38px; border-radius: 14px; background: var(--accent); color: white; display: grid; place-items: center; font-weight: 900; flex: 0 0 auto; }
+    .name-field input { border: 0; outline: 0; min-width: 0; width: 100%; font-weight: 900; text-transform: uppercase; font-size: .95rem; background: transparent; color: #0f172a; }
+    .color-options { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+    .color-dot { width: 22px; height: 22px; border-radius: 999px; background: var(--dot); border: 2px solid white; box-shadow: 0 0 0 1px rgba(15,23,42,.16), 0 3px 8px rgba(15,23,42,.12); padding: 0; }
+    .color-dot.selected { box-shadow: 0 0 0 3px white, 0 0 0 5px var(--dot), 0 8px 16px rgba(15,23,42,.16); transform: translateY(-1px); }
+
+    .score-strip { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
+    @media (min-width: 760px) { .score-strip { grid-template-columns: repeat(3, minmax(0,1fr)); } }
+    @media (min-width: 1050px) { .score-strip { grid-template-columns: repeat(6, minmax(0,1fr)); } }
+    .score-chip {
+      --accent: #7c3aed;
+      border-radius: 18px;
+      background: white;
+      border: 1px solid rgba(15,23,42,.08);
+      padding: 9px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      box-shadow: 0 8px 18px rgba(15,23,42,.05);
+    }
+    .score-chip.active { box-shadow: 0 0 0 3px rgba(124,58,237,.18), 0 10px 24px rgba(15,23,42,.08); border-color: var(--accent); }
+    .avatar { width: 36px; height: 36px; border-radius: 13px; background: var(--accent); color: white; display: grid; place-items: center; font-size: .78rem; font-weight: 900; flex: 0 0 auto; }
+    .score-chip .nm { display: block; font-size: .78rem; font-weight: 900; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; }
+    .score-chip .pts { display: block; margin-top: 3px; font-size: .85rem; font-weight: 900; color: #3730a3; }
+
+    .round-info { border-radius: 26px; padding: 14px; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; }
+    .round-info h2 { margin: 0; font-size: 2.25rem; letter-spacing: -.07em; line-height: .95; font-weight: 900; }
+    .round-info p { margin: 3px 0 0; color: #64748b; font-weight: 800; font-size: .82rem; }
+    .trump-badge { min-width: 76px; border-radius: 22px; padding: 12px; text-align: center; background: #f8fafc; border: 1px solid rgba(15,23,42,.08); }
+    .trump-badge .suit { font-size: 2.2rem; line-height: 1; font-weight: 900; }
+    .trump-badge .label { margin-top: 4px; color: #64748b; font-size: .62rem; letter-spacing: .13em; text-transform: uppercase; font-weight: 900; }
+
+    .player-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+    @media (min-width: 760px) { .player-grid { grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; } }
+    @media (min-width: 1140px) { .player-grid { grid-template-columns: repeat(3, minmax(0,1fr)); } }
+    .player-tile {
+      --accent: #7c3aed;
+      --accent-dark: #1e1b4b;
+      --soft: #ede9fe;
+      border-radius: 24px;
+      padding: 10px;
+      background: rgba(255,255,255,.96);
+      border: 1px solid rgba(15,23,42,.08);
+      box-shadow: 0 14px 28px rgba(15,23,42,.08);
+      min-width: 0;
+    }
+    .player-tile.active { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,58,237,.18), 0 16px 34px rgba(15,23,42,.10); }
+    .correction-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+    @media (min-width: 700px) { .correction-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } }
+    @media (min-width: 1120px) { .correction-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    .correction-tile { overflow: hidden; }
+    .edit-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .edit-control { min-width: 0; border-radius: 18px; padding: 9px; background: #f8fafc; border: 1px solid rgba(15,23,42,.08); }
+    .edit-control.actual { background: #fff7ed; }
+    .edit-control .field-label { margin-bottom: 7px; }
+    .edit-control .stepper.small { grid-template-columns: 38px minmax(30px, 1fr) 38px; gap: 5px; }
+    .edit-control .stepper.small .step-btn { width: 38px; height: 38px; border-radius: 14px; }
+    .edit-control .stepper.small .step-value { font-size: 1.65rem; }
+    .edit-score-meta { margin-top: 10px; padding: 10px 2px 0; border-top: 1px solid rgba(15,23,42,.07); }
+    @media (max-width: 340px) { .edit-controls { grid-template-columns: 1fr; } }
+    .player-name {
+      border-radius: 18px;
+      padding: 10px 10px;
+      color: white;
+      background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+      display: grid;
+      grid-template-columns: 36px minmax(0,1fr);
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .player-name .avatar { background: white; color: var(--accent-dark); width: 36px; height: 36px; border-radius: 14px; }
+    .player-name .small { display: block; font-size: .58rem; color: rgba(255,255,255,.72); font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+    .player-name .big { display: block; font-size: .98rem; color: white; font-weight: 900; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; }
+    .tile-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 8px 2px 0; color: #64748b; font-size: .72rem; font-weight: 900; }
+    .tile-meta b { color: #0f172a; }
+    .status-pill { border-radius: 999px; padding: 6px 8px; font-size: .68rem; font-weight: 900; text-transform: uppercase; letter-spacing: .04em; }
+
+    .made-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .made-choice { border-radius: 18px; padding: 13px 10px; min-height: 54px; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; border: 1px solid rgba(15,23,42,.10); background: #f8fafc; color: #475569; box-shadow: inset 0 -2px 0 rgba(15,23,42,.04); }
+    .made-choice.yes.active { background: #dbeafe; color: #1d4ed8; border-color: #93c5fd; box-shadow: 0 10px 24px rgba(37,99,235,.14); }
+    .made-choice.no.active { background: #ffe4e6; color: #be123c; border-color: #fda4af; box-shadow: 0 10px 24px rgba(225,29,72,.12); }
+    .made-choice:active { transform: scale(.98); }
+    .ok { background: #dbeafe; color: #1d4ed8; }
+    .bad { background: #ffe4e6; color: #be123c; }
+    .warn { background: #fef3c7; color: #92400e; }
+
+    .action-panel { margin-top: 12px; border-radius: 26px; padding: 12px; display: grid; gap: 10px; }
+    @media (min-width: 760px) { .action-panel { grid-template-columns: 1fr auto; align-items: center; } }
+    .total-box { border-radius: 20px; padding: 13px; background: #f8fafc; border: 1px solid rgba(15,23,42,.08); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .total-box.bid-invalid { background: #fff1f2; border-color: #fecdd3; box-shadow: inset 0 0 0 1px rgba(225,29,72,.08); }
+    .total-box strong { font-size: 2rem; font-weight: 900; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+    .total-box span { color: #64748b; font-size: .72rem; font-weight: 900; text-transform: uppercase; letter-spacing: .12em; }
+    .bid-rule-note { margin: 4px 0 0; color: #64748b; font-size: .78rem; font-weight: 800; line-height: 1.25; }
+    .bid-rule-note.bad { color: #be123c; }
+    .total-box.invalid { background: #fff1f2; border-color: #fecdd3; }
+    .total-box.invalid strong { color: #e11d48; }
+    .error { margin-top: 10px; border-radius: 20px; padding: 12px 14px; background: #fff1f2; color: #be123c; border: 1px solid #fecdd3; font-weight: 900; }
+
+    .result-list { display: grid; gap: 10px; }
+    @media (min-width: 760px) { .result-list { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+    .result-item { --accent:#7c3aed; border-radius: 22px; padding: 12px; background: white; border: 1px solid rgba(15,23,42,.08); display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+    .result-item h3 { margin: 0; font-size: 1.08rem; line-height: 1.05; font-weight: 900; text-transform: uppercase; }
+    .result-item p { margin: 4px 0 0; color: #64748b; font-size: .75rem; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; }
+    .score-number { font-size: 2rem; line-height: 1; font-weight: 900; font-variant-numeric: tabular-nums; }
+    .pos { color: #0d9488; } .neg { color: #e11d48; } .zero { color: #94a3b8; }
+
+    .bottom-nav {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      z-index: 60;
+      background: rgba(255,255,255,.92);
+      border-top: 1px solid rgba(15,23,42,.10);
+      backdrop-filter: blur(18px);
+      box-shadow: 0 -14px 38px rgba(15,23,42,.09);
+    }
+    .nav-grid { width: min(640px, 100%); margin: 0 auto; padding: 7px 8px; display: grid; grid-template-columns: repeat(4,1fr); gap: 4px; }
+    .nav-btn { border-radius: 16px; padding: 9px 4px; background: transparent; color: #475569; font-size: .65rem; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; }
+    .nav-btn .ico { display:block; font-size: 1.12rem; margin-bottom: 2px; }
+    .nav-btn.active { background: #eef2ff; color: #3730a3; }
+    .nav-btn.danger { color: #e11d48; }
+
+    .modal-backdrop { position: fixed; inset: 0; z-index: 100; background: rgba(15,23,42,.74); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; padding: max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom)); }
+    .modal { width: min(1120px, calc(100vw - 20px)); max-height: calc(100dvh - 20px); overflow: hidden; display: flex; flex-direction: column; border-radius: 28px; background: white; box-shadow: 0 24px 90px rgba(0,0,0,.28); }
+    .modal-head { padding: 14px; color: white; flex: 0 0 auto; }
+    .modal-head-row { position: relative; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .modal-head-row > div { min-width: 0; }
+    .modal-title { margin: 0; font-size: 1.35rem; font-weight: 900; letter-spacing: -.04em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .modal-body { overflow: auto; padding: 14px; -webkit-overflow-scrolling: touch; }
+    .close { flex: 0 0 40px; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 15px; background: rgba(255,255,255,.18); color: white; border: 1px solid rgba(255,255,255,.24); font-size: 1.35rem; font-weight: 900; line-height: 1; position: relative; z-index: 5; }
+
+    .summary-mobile { display: grid; gap: 10px; }
+    .summary-desktop { display: none; overflow: auto; }
+    @media (min-width: 820px) { .summary-mobile { display:none; } .summary-desktop { display:block; } }
+    .modal .summary-mobile { display: none; }
+    .modal .summary-desktop { display: block; overflow: auto; -webkit-overflow-scrolling: touch; border: 1px solid #e2e8f0; border-radius: 18px; }
+    .modal .summary-desktop table { min-width: 760px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: center; vertical-align: middle; }
+    th { position: sticky; top: 0; background: #f8fafc; z-index: 1; color: #475569; font-size: .7rem; text-transform: uppercase; letter-spacing: .1em; }
+    td:first-child, th:first-child { text-align: left; position: sticky; left: 0; background: inherit; z-index: 2; }
+    th:first-child { background:#f8fafc; z-index: 3; }
+
+    .share-grid { display: grid; gap: 10px; }
+    @media (min-width: 760px) { .share-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+    .share-card { border-radius: 24px; padding: 14px; border: 1px solid rgba(15,23,42,.10); background: #f8fafc; }
+    .share-card h3 { margin: 0 0 5px; font-size: 1.15rem; font-weight: 900; text-transform: uppercase; letter-spacing: .03em; }
+    .share-card p { margin: 0 0 12px; color: #64748b; font-size: .85rem; font-weight: 700; line-height: 1.35; }
+
+    .final-rank { display: grid; gap: 10px; }
+    .rank-row { border-radius: 22px; padding: 12px; display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; background: white; border: 1px solid rgba(15,23,42,.08); }
+    .rank-badge { width: 44px; height: 44px; border-radius: 16px; display: grid; place-items:center; color:white; background:#312e81; font-weight:900; }
+    .rank-row h3 { margin: 0; font-size: 1.15rem; font-weight: 900; text-transform: uppercase; }
+    .rank-row p { margin: 2px 0 0; color: #64748b; font-size: .75rem; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; }
+
+    @media (max-width: 430px) {
+      .wrap { width: min(100% - 16px, 1180px); }
+      .hero { padding-bottom: 68px; border-radius: 0 0 24px 24px; }
+      .pull-up { margin-top: -48px; }
+      .hero-row { gap: 8px; }
+      .hero h1 { font-size: 2.35rem; }
+      .brand-title { font-size: clamp(3.05rem, 16.2vw, 4.65rem); letter-spacing: .005em; }
+      .hero-actions { max-width: 144px; }
+      .hero-btn { padding: 9px 10px; border-radius: 14px; font-size: .62rem; }
+      .setup-card { border-radius: 22px; padding: 12px; }
+      .choice { border-radius: 16px; padding: 12px; }
+      .choice strong { font-size: .88rem; }
+      .choice span { font-size: .68rem; }
+      .modal-backdrop { align-items: flex-start; padding: 8px; }
+      .modal { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); border-radius: 24px; }
+      .modal-head { padding: 12px; }
+      .close { flex-basis: 40px; width: 40px; height: 40px; border-radius: 14px; }
+      .round-info { border-radius: 22px; padding: 12px; }
+      .round-info h2 { font-size: 1.9rem; }
+      .trump-badge { min-width: 66px; padding: 10px; border-radius: 18px; }
+      .trump-badge .suit { font-size: 1.85rem; }
+      .player-grid { gap: 8px; }
+      .player-tile { border-radius: 20px; padding: 8px; }
+      .player-name { border-radius: 16px; padding: 8px; grid-template-columns: 32px minmax(0,1fr); }
+      .player-name .avatar { width: 32px; height: 32px; border-radius: 12px; font-size: .72rem; }
+      .player-name .big { font-size: .84rem; }
+      .stepper { grid-template-columns: 38px minmax(36px,1fr) 38px; gap: 5px; }
+      .step-btn { width: 38px; height: 38px; border-radius: 14px; font-size: 1.25rem; }
+      .step-value { font-size: 1.85rem; }
+      .edit-control { padding: 8px; border-radius: 16px; }
+      .edit-control .stepper.small { grid-template-columns: 36px minmax(28px,1fr) 36px; gap: 4px; }
+      .edit-control .stepper.small .step-btn { width: 36px; height: 36px; border-radius: 13px; font-size: 1.15rem; }
+      .edit-control .stepper.small .step-value { font-size: 1.48rem; }
+      .tile-meta { font-size: .65rem; }
+      .btn { border-radius: 18px; padding: 12px 14px; min-height: 46px; }
+      .score-strip { gap: 7px; }
+      .score-chip { border-radius: 16px; padding: 8px; }
+      .score-chip .avatar { width: 32px; height: 32px; border-radius: 12px; }
+      .score-chip .nm { font-size: .7rem; }
+      .score-chip .pts { font-size: .78rem; }
+    }
+  
+    body {background:#f1eee4;color:#182f29}
+    .felt {background:radial-gradient(ellipse at top left,#245f4e,#103e35 58%,#092e28)}
+    .felt:before {background:repeating-linear-gradient(125deg,transparent 0 6px,#ffffff05 6px 7px)}
+    .glass,.card {background:#fffdf5;border-color:#d9dacb}
+    .btn-primary,.choice.active {background:#15523e;border-color:#15523e;box-shadow:0 4px 9px #123c2918}
+    .btn-gold,.double-mark,.double-btn[aria-pressed="true"] {background:#ffd263;color:#382900}
+    .preview span {background:#e5f1dc;color:#244c39;border-color:#c7d8bd}
+    .brand-title {font-family:Georgia,serif;font-size:clamp(2.3rem,9vw,6.6rem);font-weight:normal;letter-spacing:-.055em;color:#fff5d8}
+    .welcome-table {outline:1px solid #c5b87e80;outline-offset:-11px}
+    .hand {width:min(260px,85%);padding:8px}
+    .hand .card {position:relative;box-shadow:0 4px 10px #00261f60;transform:rotate(-12deg)}
+    .hand .card:before {content:"A";position:absolute;top:5px;left:7px;font:14px Georgia,serif}
+    .hand .card:nth-child(2){transform:translateY(-6px) rotate(-4deg)}
+    .hand .card:nth-child(3){transform:translateY(-6px) rotate(4deg)}
+    .hand .card:nth-child(4){transform:rotate(12deg)}
+    .double-btn,.double-mark {display:inline-block;vertical-align:middle;padding:8px 12px;border-radius:9px;font:700 .85rem system-ui;letter-spacing:.03em}
+    .double-btn {background:#f7f3e7;color:#35423c;border:1px solid #9eaa9c;min-height:40px}
+    .color-dot {width:27px;height:27px;color:#152b26;font-size:15px}
+    .avatar,.name-num {color:#172b23}
+    .player-name {background:var(--accent-dark)}
+    button:focus-visible {outline:3px solid #b17b12;outline-offset:3px}
+    .made-choice:disabled {opacity:.35;cursor:default}
+    .forced-note {color:#34594a;font-weight:700}
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /*
+    LIVE SCORE SYNC SETUP
+    ---------------------
+    This file works immediately on GitHub Pages for admin/local scorekeeping,
+    snapshot links, and copyable text summary
+
+    For true live score updates on every phone, create a Firebase Realtime
+    Database project and paste your web config below. Then use Share > START LIVE.
+  */
+  const FIREBASE_CONFIG = {};
+
+  const STORAGE_KEY = "kachuful_mobile_fixed_v2";
+  const OLD_KEYS = ["kachuful_mobile_fixed_v1", "kachuful_pro_state_v4", "kachuful_pro_state_v3", "kachuful_pro_state_v2"];
+  const MIN_PLAYERS = 3;
+  const MAX_PLAYERS = 12;
+
+  const SUITS = [
+    { name: "Spades", short: "KA", icon: "\u2660", color: "#111827", soft: "#f1f5f9" },
+    { name: "Diamonds", short: "CHU", icon: "\u2666", color: "#dc2626", soft: "#fef2f2" },
+    { name: "Clubs", short: "FU", icon: "\u2663", color: "#111827", soft: "#f1f5f9" },
+    { name: "Hearts", short: "L", icon: "\u2665", color: "#dc2626", soft: "#fef2f2" }
+  ];
+  const NO_TRUMP = { name: "No Trump", short: "NT", icon: "NT", color: "#0f172a", soft: "#e2e8f0" };
+
+  const THEMES = [
+    { name: "Aqua", symbol: "◆", a: "#19d2bb", d: "#134e4a", s: "#ccfbf1" },
+    { name: "Sapphire", symbol: "★", a: "#548aff", d: "#1e3a8a", s: "#dbeafe" },
+    { name: "Tangerine", symbol: "☀", a: "#ff923c", d: "#9a3412", s: "#ffedd5" },
+    { name: "Iris", symbol: "✦", a: "#aa76ff", d: "#4c1d95", s: "#ede9fe" },
+    { name: "Cherry", symbol: "♥", a: "#ff5366", d: "#7f1d1d", s: "#fee2e2" },
+    { name: "Sky", symbol: "●", a: "#33c4fb", d: "#075985", s: "#e0f2fe" },
+    { name: "Sunflower", symbol: "✿", a: "#ffd230", d: "#713f12", s: "#fef9c3" },
+    { name: "Citrus", symbol: "▲", a: "#b7e636", d: "#0f172a", s: "#e2e8f0" },
+    { name: "Bubblegum", symbol: "♣", a: "#ff8ed0", d: "#9d174d", s: "#fce7f3" },
+    { name: "Jade", symbol: "☘", a: "#42db99", d: "#065f46", s: "#d1fae5" },
+    { name: "Lilac", symbol: "☾", a: "#cc97ff", d: "#5b21b6", s: "#f3e8ff" },
+    { name: "Apricot", symbol: "♦", a: "#ffb47a", d: "#451a03", s: "#fef3c7" },
+    { name: "Periwinkle", symbol: "✚", a: "#829aff", d: "#111827", s: "#dbeafe" },
+    { name: "Orchid", symbol: "♠", a: "#ec70ed", d: "#701a75", s: "#fae8ff" },
+    { name: "Guava", symbol: "▼", a: "#ff8880", d: "#9f1239", s: "#ffe4e6" },
+    { name: "Lime", symbol: "⬟", a: "#93dd43", d: "#365314", s: "#ecfccb" }
+  ];
+
+  const DEFAULT_CONFIG = {
+    playerCount: 5,
+    playerNames: ["Player 1", "Player 2", "Player 3", "Player 4", "Player 5"],
+    playerColors: [0, 1, 2, 3, 4],
+    deckCount: 1,
+    roundMode: "upDown",
+    cardsPerPlayer: 10,
+    totalRounds: 20,
+    customSequence: "10",
+    trumpMode: "with",
+    lastBidRule: true
+  };
+
+  const app = document.getElementById("app");
+  let liveRef = null;
+  let syncTimer = null;
+
+  const state = {
+    screen: "welcome",
+    config: normalizeConfig(DEFAULT_CONFIG),
+    game: null,
+    pinned: null,
+    modal: null,
+    editIndex: null,
+    editReturn: "result",
+    error: "",
+    viewerKind: null,
+    shareCode: generateMatchCode(),
+    sync: { enabled: false, role: null, matchCode: "", status: "Offline", error: "" }
+  };
+
+  function esc(value) {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, function(ch) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" }[ch];
+    });
+  }
+  function clamp(value, min, max) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return min;
+    return Math.max(min, Math.min(max, Math.round(n)));
+  }
+  function range(start, end) {
+    const out = [];
+    const step = start <= end ? 1 : -1;
+    for (let v = start; step > 0 ? v <= end : v >= end; v += step) out.push(v);
+    return out;
+  }
+  function maxCardsFor(configOrCount, deckCount) {
+    const count = typeof configOrCount === "object" ? configOrCount.playerCount : configOrCount;
+    const decks = typeof configOrCount === "object" ? configOrCount.deckCount : deckCount;
+    return Math.max(1, Math.floor((Number(decks || 1) * 52) / Number(count || 1)));
+  }
+  function colorIndexFor(i) {
+    let chosen = null;
+    if (state && state.screen !== "setup" && state.game && state.game.players && state.game.players[i] && state.game.players[i].colorIndex != null) chosen = state.game.players[i].colorIndex;
+    else if (state && state.config && Array.isArray(state.config.playerColors)) chosen = state.config.playerColors[i];
+    return clamp(chosen == null ? i : chosen, 0, THEMES.length - 1);
+  }
+  function theme(i) { return THEMES[colorIndexFor(i)] || THEMES[i % THEMES.length]; }
+  function themeStyle(i) {
+    const t = theme(i);
+    return "--accent:" + t.a + ";--accent-dark:" + t.d + ";--soft:" + t.s + ";";
+  }
+  function initials(name) {
+    const parts = String(name || "?").trim().split(/\s+/).filter(Boolean);
+    return (parts.slice(0,2).map(function(p){ return p[0] ? p[0].toUpperCase() : ""; }).join("") || "?").slice(0,2);
+  }
+  function formatScore(n) { return Number(n) > 0 ? "+" + n : String(n); }
+  function scoreCls(n) { return Number(n) > 0 ? "pos" : Number(n) < 0 ? "neg" : "zero"; }
+  function scoreByMade(bid, made, mode, round) {
+    const tricks = Number(bid || 0);
+    if (tricks === 0 && made && mode === "zero") return 0;
+    const points = Math.max(1, tricks) * 10 * (round.doublePoints ? 2 : 1);
+    return made ? points : -points;
+  }
+  function madeValue(round, i) {
+    if (round && Array.isArray(round.made) && round.made[i] !== null && round.made[i] !== undefined) return Boolean(round.made[i]);
+    if (round && round.status === "completed" && Array.isArray(round.actual)) return Number(round.actual[i] || 0) === Number(round.bids[i] || 0);
+    return null;
+  }
+  // Bit t is set when the players processed so far can take exactly t tricks.
+  function fitsRound(round, marks) {
+    const target = 1n << BigInt(round.cards);
+    const mask = (target << 1n) - 1n;
+    let totals = 1n;
+    for (let i = 0; i < round.bids.length; i++) {
+      const bid = Number(round.bids[i]);
+      if (marks[i] === true) {
+        totals = (totals << BigInt(bid)) & mask;
+      } else {
+        let next = 0n;
+        for (let tricks = 0; tricks <= round.cards; tricks++) {
+          if (marks[i] !== false || tricks !== bid) next |= totals << BigInt(tricks);
+        }
+        totals = next & mask;
+      }
+      if (!totals) return false;
+    }
+    return Boolean(totals & target);
+  }
+
+  function roundChoices(round) {
+    const marks = round.bids.map((_, i) => round.made?.[i] ?? null);
+    return marks.map((manual, i) => {
+      const candidate = marks.slice();
+      candidate[i] = true;
+      const yes = fitsRound(round, candidate);
+      candidate[i] = false;
+      const no = fitsRound(round, candidate);
+      const forced = manual === null && yes !== no;
+      return { yes, no, forced, value: forced ? yes : manual };
+    });
+  }
+
+  function editRound() {
+    if (!state.editDraft) {
+      const original = state.game.rounds[state.editIndex ?? state.game.currentIndex];
+      state.editDraft = JSON.parse(JSON.stringify(original));
+      state.editDraft.made = original.inputMarks?.slice() || original.bids.map((_, i) => madeValue(original, i));
+    }
+    return state.editDraft;
+  }
+  function madeLabel(round, i) {
+    const made = madeValue(round, i);
+    if (made === null) return "-";
+    return made ? "Made" : "Missed";
+  }
+  function madeShort(round, i) {
+    const made = madeValue(round, i);
+    if (made === null) return "-";
+    return made ? "Yes" : "No";
+  }
+  function isBlockedBidTotal(total, cards) {
+    return Number(total || 0) === Number(cards || 0);
+  }
+  function bidRuleText(total, cards) {
+    return isBlockedBidTotal(total, cards) ? "Invalid bid total" : "";
+  }
+  function defaultNames(count) {
+    return Array.from({ length: count }, function(_, i){ return "Player " + (i + 1); });
+  }
+  function sanitizeCode(code) {
+    return String(code || "").toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 18);
+  }
+  function generateMatchCode() {
+    const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let code = "KACHU-";
+    for (let i = 0; i < 4; i++) code += letters[Math.floor(Math.random() * letters.length)];
+    return code;
+  }
+
+  function normalizeConfig(raw) {
+    raw = raw || {};
+    const playerCount = clamp(raw.playerCount || DEFAULT_CONFIG.playerCount, MIN_PLAYERS, MAX_PLAYERS);
+    const deckCount = Number(raw.deckCount) === 2 ? 2 : 1;
+    const maxAllowed = maxCardsFor(playerCount, deckCount);
+    const fallbackCards = Math.min(10, maxAllowed);
+    const names = Array.isArray(raw.playerNames) ? raw.playerNames.slice() : defaultNames(playerCount);
+    while (names.length < playerCount) names.push("Player " + (names.length + 1));
+    const colors = Array.isArray(raw.playerColors) ? raw.playerColors.slice() : [];
+    while (colors.length < playerCount) colors.push(colors.length % THEMES.length);
+    const modeOk = ["upDown", "downUp", "custom"].includes(raw.roundMode);
+    return {
+      scoringMode: raw.scoringMode === "zero" ? "zero" : "regular",
+      playerCount: playerCount,
+      playerNames: names.slice(0, playerCount),
+      playerColors: colors.slice(0, playerCount).map(function(value, i){ return clamp(value == null ? i : value, 0, THEMES.length - 1); }),
+      deckCount: deckCount,
+      roundMode: modeOk ? raw.roundMode : DEFAULT_CONFIG.roundMode,
+      cardsPerPlayer: maxAllowed,
+      totalRounds: clamp(raw.totalRounds || DEFAULT_CONFIG.totalRounds, 1, 300),
+      customSequence: String(raw.customSequence || DEFAULT_CONFIG.customSequence),
+      trumpMode: raw.trumpMode === "none" ? "none" : "with",
+      lastBidRule: true
+    };
+  }
+
+  function parseCustomSequence(text, maxAllowed) {
+    const out = [];
+    String(text || "").split(/[\s,]+/).filter(Boolean).forEach(function(token){
+      const rangeMatch = token.match(/^(\d+)\s*-\s*(\d+)$/);
+      if (rangeMatch) {
+        range(Number(rangeMatch[1]), Number(rangeMatch[2])).forEach(function(v){
+          if (v >= 1 && v <= maxAllowed) out.push(v);
+        });
+      } else {
+        const v = Number(token);
+        if (Number.isFinite(v) && v >= 1 && v <= maxAllowed) out.push(Math.round(v));
+      }
+    });
+    return out;
+  }
+
+  function buildSequence(config) {
+    config = normalizeConfig(config);
+    const max = config.cardsPerPlayer;
+    let base;
+    if (config.roundMode === "upDown") base = range(1, max).concat(range(max, 1));
+    else if (config.roundMode === "downUp") base = range(max, 1).concat(range(1, max));
+    else base = parseCustomSequence(config.customSequence, maxCardsFor(config));
+    if (!base.length) base = [max];
+    return Array.from({ length: config.totalRounds }, function(_, i){ return base[i % base.length]; });
+  }
+
+  function recalcGame(game) {
+    if (!game) return game;
+    const players = game.players.map(function(p, i){ return Object.assign({}, p, { colorIndex: p.colorIndex != null ? p.colorIndex : (state.config.playerColors && state.config.playerColors[i] != null ? state.config.playerColors[i] : i), totalScore: 0 }); });
+    const rounds = game.rounds.map(function(r){
+      const round = Object.assign({}, r);
+      if (round.status === "completed") {
+        round.scores = round.bids.map(function(bid, i){
+          const made = madeValue(round, i);
+          return scoreByMade(bid, made, game.scoringMode, round);
+        });
+        round.scores.forEach(function(score, i){ players[i].totalScore += score; });
+      } else {
+        round.scores = Array(players.length).fill(0);
+      }
+      return round;
+    });
+    const finished = Boolean(game.isFinished || game.endedEarly) || (rounds.length > 0 && rounds.every(function(r){ return r.status === "completed"; }));
+    return Object.assign({}, game, { players: players, rounds: rounds, isFinished: finished });
+  }
+
+  function standings(players) {
+    return (players || []).slice().sort(function(a,b){ return b.totalScore - a.totalScore; });
+  }
+  function completedCount(game) {
+    return game && game.rounds ? game.rounds.filter(function(r){ return r.status === "completed"; }).length : 0;
+  }
+  function currentRound() {
+    return state.game && state.game.rounds ? state.game.rounds[state.game.currentIndex] : null;
+  }
+  function currentScreenForGame() {
+    if (!state.game) return "welcome";
+    if (state.game.isFinished) return "final";
+    const r = currentRound();
+    if (!r) return "welcome";
+    if (r.status === "bidding") return "bidding";
+    if (r.status === "playing") return "scoring";
+    return "result";
+  }
+  function updateGame(nextGame) { state.game = recalcGame(nextGame); }
+
+  function saveLocal() {
+    if (state.viewerKind) return;
+    if (state.game) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ screen: state.screen, config: state.config, game: state.game }));
+    }
+  }
+  function clearLocal() {
+    localStorage.removeItem(STORAGE_KEY);
+    OLD_KEYS.forEach(function(k){ localStorage.removeItem(k); });
+  }
+
+  function encodeSnapshot(obj) {
+    const json = JSON.stringify(obj);
+    if (window.TextEncoder) {
+      const bytes = new TextEncoder().encode(json);
+      let binary = "";
+      bytes.forEach(function(b){ binary += String.fromCharCode(b); });
+      return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+    }
+    return btoa(unescape(encodeURIComponent(json))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  }
+  function decodeSnapshot(value) {
+    let input = String(value || "").replace(/-/g, "+").replace(/_/g, "/");
+    input += "=".repeat((4 - input.length % 4) % 4);
+    const binary = atob(input);
+    if (window.TextDecoder) {
+      const bytes = Uint8Array.from(binary, function(ch){ return ch.charCodeAt(0); });
+      return JSON.parse(new TextDecoder().decode(bytes));
+    }
+    return JSON.parse(decodeURIComponent(escape(binary)));
+  }
+  function baseUrl() { return window.location.origin + window.location.pathname; }
+  function snapshotPayload() {
+    return { type: "kachuful-snapshot", version: 2, generatedAt: Date.now(), config: state.config, game: state.game };
+  }
+  function snapshotLink(playerId) {
+    return baseUrl() + "?view=" + encodeSnapshot(snapshotPayload()) + (playerId != null ? "&player=" + playerId : "");
+  }
+  function liveLink(code, playerId) {
+    return baseUrl() + "?match=" + encodeURIComponent(sanitizeCode(code)) + (playerId != null ? "&player=" + playerId : "");
+  }
+  function copyText(text, label) {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(function(){ alert((label || "Text") + " copied."); }).catch(function(){ window.prompt("Copy this:", text); });
+    } else {
+      window.prompt("Copy this:", text);
+    }
+  }
+
+  function firebaseConfigured() {
+    return Boolean(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.databaseURL && FIREBASE_CONFIG.projectId);
+  }
+  function getDb() {
+    if (!firebaseConfigured()) throw new Error("Firebase config is missing in this HTML file.");
+    if (!window.firebase) throw new Error("Firebase SDK did not load.");
+    if (!window.firebase.apps.length) window.firebase.initializeApp(FIREBASE_CONFIG);
+    return window.firebase.database();
+  }
+  function stopLiveListener() {
+    if (liveRef) { liveRef.off(); liveRef = null; }
+  }
+  function listenLive(code) {
+    stopLiveListener();
+    if (!firebaseConfigured()) {
+      state.sync.status = "Firebase not configured";
+      state.sync.error = "Live links need Firebase config in this HTML file.";
+      render();
+      return;
+    }
+    try {
+      const db = getDb();
+      liveRef = db.ref("kachufulMatches/" + sanitizeCode(code));
+      state.sync.status = "Listening for live scores";
+      liveRef.on("value", function(snap){
+        const data = snap.val();
+        if (!data || !data.game) {
+          state.sync.status = "Waiting for admin";
+          render();
+          return;
+        }
+        state.config = normalizeConfig(data.config || DEFAULT_CONFIG);
+        state.game = recalcGame(data.game);
+        state.screen = "viewer";
+        state.viewerKind = "live";
+        state.sync.status = "Live updated " + new Date(data.updatedAt || Date.now()).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+        state.sync.error = "";
+        render();
+      }, function(error){
+        state.sync.status = "Live error";
+        state.sync.error = error.message;
+        render();
+      });
+    } catch (error) {
+      state.sync.status = "Live error";
+      state.sync.error = error.message;
+      render();
+    }
+  }
+  function scheduleLiveSync() {
+    if (!(state.sync.enabled && state.sync.role === "admin" && state.sync.matchCode && state.game)) return;
+    if (!firebaseConfigured()) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(function(){
+      try {
+        const db = getDb();
+        db.ref("kachufulMatches/" + sanitizeCode(state.sync.matchCode)).set({ game: state.game, config: state.config, updatedAt: Date.now() })
+          .then(function(){ state.sync.status = "Synced " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); render(); })
+          .catch(function(error){ state.sync.status = "Sync failed"; state.sync.error = error.message; render(); });
+      } catch (error) {
+        state.sync.status = "Sync failed";
+        state.sync.error = error.message;
+        render();
+      }
+    }, 250);
+  }
+
+  function commit() {
+    saveLocal();
+    scheduleLiveSync();
+    render();
+  }
+
+  function header(title, subtitle, showActions) {
+    return `<header class="hero felt safe-top"><div class="wrap on-felt">
+      <div class="hero-row">
+        <div><p class="eyebrow">${esc(subtitle || "")}</p><h1>${esc(title)}</h1></div>
+        ${showActions ? `<div class="hero-actions">
+          <button class="hero-btn" data-action="go-current">Current</button>
+          <button class="hero-btn" data-action="open-summary">Summary</button>
+          <button class="hero-btn" data-action="open-share">Share</button>
+        </div>` : `<div class="hero-actions"><button class="hero-btn" data-screen="welcome">Home</button></div>`}
+      </div>
+    </div></header>`;
+  }
+
+  function welcomeScreen() {
+    const hasGame = Boolean(state.game);
+    const champion = hasGame ? standings(state.game.players)[0] : null;
+    return `<main class="page no-nav safe-top safe-bottom"><div class="wrap" style="padding-top:18px;">
+      <section class="felt welcome-table" style="border-radius:34px; padding:24px; min-height:330px; display:flex; flex-direction:column; justify-content:space-between; box-shadow:0 24px 70px rgba(30,27,75,.26);">
+        <div class="on-felt">
+          <p class="eyebrow">Card game scorekeeper</p>
+          <h1 class="brand-title">KACHUFUL</h1>
+        </div>
+        <div class="on-felt hand" aria-hidden="true" style="display:grid; grid-template-columns:repeat(4,1fr); gap:10px; max-width:330px; margin-top:24px;">
+          ${SUITS.map(function(s){ return `<div class="card" style="border-radius:20px; aspect-ratio:.72; display:grid; place-items:center; font-size:2.4rem; color:${s.color}; font-weight:900;">${s.icon}</div>`; }).join("")}
+        </div>
+      </section>
+      <section class="glass" style="border-radius:28px; padding:14px; margin-top:12px; display:grid; gap:10px;">
+        <button class="btn btn-primary btn-full" data-screen="setup" style="font-size:1.25rem;">New Match</button>
+        ${hasGame ? `<button class="btn btn-gold btn-full" data-action="go-current">Current Match - Round ${state.game.currentIndex + 1}/${state.game.rounds.length}</button>` : ""}
+        <button class="btn btn-light btn-full" data-screen="rules">How to Play</button>
+        ${hasGame ? `<div class="card" style="border-radius:24px; padding:14px;"><div class="section-title"><div><p>Saved game</p><h2>${esc(champion ? champion.name : "Match")}</h2></div><strong>${completedCount(state.game)}/${state.game.rounds.length}</strong></div>${scoreStrip()}</div>` : ""}
+      </section>
+    </div></main>`;
+  }
+
+  function setupStepper(field, value, min, max) {
+    return `<div class="stepper"><button class="step-btn" data-action="setup-step" data-field="${field}" data-delta="-1">-</button><div class="step-value">${value}</div><button class="step-btn" data-action="setup-step" data-field="${field}" data-delta="1">+</button></div>`;
+  }
+
+  function setupScreen() {
+    const c = normalizeConfig(state.config);
+    state.config = c;
+    const maxAllowed = maxCardsFor(c);
+    const seq = buildSequence(c);
+    const preview = seq.slice(0, 24).map(function(n){ return `<span>${n}</span>`; }).join("") + (seq.length > 24 ? `<span class="more">+${seq.length - 24}</span>` : "");
+    return `<main class="page no-nav">${header("Setup", "Build your match", false)}
+      <div class="wrap pull-up">
+        <div class="grid-2">
+          <section class="glass setup-card">
+            <div class="section-title"><div><p>Table</p><h2>Players and decks</h2></div></div>
+            <div style="display:grid; gap:14px;">
+              <div><label class="field-label">Players</label>${setupStepper("playerCount", c.playerCount, MIN_PLAYERS, MAX_PLAYERS)}</div>
+              <div><label class="field-label">Deck packs</label><div class="choice-grid">
+                <button class="choice ${c.deckCount === 1 ? "active" : ""}" data-action="select-decks" data-value="1"><strong>1 deck</strong><span>52 cards</span></button>
+                <button class="choice ${c.deckCount === 2 ? "active" : ""}" data-action="select-decks" data-value="2"><strong>2 decks</strong><span>104 cards</span></button>
+              </div></div>
+              <div><label class="field-label">Total rounds</label>${setupStepper("totalRounds", c.totalRounds, 1, 300)}</div>
+              <div><label class="field-label">Trump option</label><div class="choice-grid">
+                <button class="choice ${c.trumpMode === "with" ? "active" : ""}" data-action="select-trump" data-value="with"><strong>With Trump</strong></button>
+                <button class="choice ${c.trumpMode === "none" ? "active" : ""}" data-action="select-trump" data-value="none"><strong>No Trump</strong></button>
+              </div></div>
+            </div>
+          </section>
+
+          <section class="glass setup-card">
+            <div class="section-title"><div><p>Rounds</p><h2>Pattern</h2></div></div>
+            <div class="choice-grid three">
+              <button class="choice ${c.roundMode === "upDown" ? "active" : ""}" data-action="select-round-mode" data-value="upDown"><strong>One to Max</strong></button>
+              <button class="choice ${c.roundMode === "downUp" ? "active" : ""}" data-action="select-round-mode" data-value="downUp"><strong>Max to One</strong></button>
+              <button class="choice ${c.roundMode === "custom" ? "active" : ""}" data-action="select-round-mode" data-value="custom"><strong>Custom</strong></button>
+            </div>
+            <div style="margin-top:14px; display:${c.roundMode === "custom" ? "block" : "none"};">
+              <label class="field-label">Custom sequence</label>
+              <textarea class="input textarea" data-input="customSequence" placeholder="Example: 10 or 1-10,10-1">${esc(c.customSequence)}</textarea>
+              </div>
+            <div class="card" style="border-radius:24px; padding:14px; margin-top:14px;">
+              <div class="section-title"><div><p>Preview</p><h2>${seq.length} rounds</h2></div></div>
+              <div class="preview">${preview}</div>
+            </div>
+          </section>
+        </div>
+
+        <section class="glass setup-card" style="margin-top:12px;">
+          <div class="section-title"><h2>Scoring mode</h2></div>
+          <div class="choice-grid">
+            ${["regular", "zero"].map(function(mode){
+              return `<button class="choice ${c.scoringMode === mode ? "active" : ""}" aria-pressed="${c.scoringMode === mode}" data-action="scoring-mode" data-value="${mode}"><strong>${mode === "zero" ? "0 Scoring" : "Regular"}</strong><span>Made zero · ${mode === "zero" ? "0" : "+10"} points</span></button>`;
+            }).join("")}
+          </div><p class="help">A missed zero costs 10 points in either mode.</p>
+        </section>
+        <section class="glass setup-card" style="margin-top:12px;">
+          <div class="section-title"><div><p>Profile colors</p><h2>Players</h2></div></div>
+          <div class="name-grid">
+            ${c.playerNames.map(function(name, i){ return `<div class="name-field" style="${themeStyle(i)}"><span class="name-num">${THEMES[c.playerColors[i]].symbol}</span><div class="name-main"><input data-input="playerName" data-index="${i}" value="${esc(name)}" placeholder="Player ${i+1}"><div class="color-options" aria-label="Choose ${esc(name)} color">${THEMES.map(function(t, colorIdx){ return `<button type="button" class="color-dot ${c.playerColors[i] === colorIdx ? "selected" : ""}" style="--dot:${t.a};" data-action="set-player-color" data-index="${i}" data-color="${colorIdx}" aria-label="${esc(t.name)}" aria-pressed="${c.playerColors[i] === colorIdx}" title="${esc(t.name)}">${t.symbol}</button>`; }).join("")}</div></div></div>`; }).join("")}
+          </div>
+          <div style="margin-top:14px;">
+            <button class="btn btn-primary btn-full" data-action="start-match">Start Match</button>
+          </div>
+        </section>
+      </div>
+    </main>`;
+  }
+
+  function activeHeader(title, subtitle) {
+    return `${header(title, subtitle, true)}<div class="wrap pull-up"><div class="glass round-info">${roundInfo()}</div><div style="height:10px"></div>${scoreStrip()}</div>`;
+  }
+
+  function roundInfo() {
+    const r = currentRound();
+    if (!r) return "";
+    const trump = r.trump || NO_TRUMP;
+    const canToggle = !state.viewerKind && ["bidding", "scoring"].includes(state.screen);
+    const multiplier = canToggle
+      ? `<button class="double-btn" aria-label="Double points for this round" aria-pressed="${Boolean(r.doublePoints)}" data-action="double-round">2X · ${r.doublePoints ? "On" : "Off"}</button>`
+      : (r.doublePoints ? '<b class="double-mark">2X</b>' : "");
+    return `<div><p class="eyebrow" style="color:#52655a;">Round ${r.num} of ${state.game.rounds.length} · ${state.game.scoringMode === "zero" ? "0 Scoring" : "Regular"}</p><h2>${r.cards} ${r.cards === 1 ? "card" : "cards"} ${multiplier}</h2></div><div class="trump-badge" style="background:${trump.soft};"><div class="suit" style="color:${trump.color};">${esc(trump.icon)}</div><div class="label">${esc(trump.name)}</div></div>`;
+  }
+
+  function scoreStrip() {
+    if (!state.game) return "";
+    return `<div class="score-strip">${state.game.players.map(function(p, i){
+      return `<button class="score-chip ${state.pinned === i ? "active" : ""}" style="${themeStyle(i)}" data-action="toggle-pin" data-index="${i}"><span class="avatar">${theme(i).symbol}</span><span style="min-width:0;"><span class="nm">${esc(p.name)}</span><span class="pts">${p.totalScore} pts</span></span></button>`;
+    }).join("")}</div>`;
+  }
+
+  function playerTile(player, i, kind, choice) {
+    const r = kind === "edit" ? editRound() : currentRound();
+    const isActive = state.pinned === i;
+    const bid = r.bids[i] || 0;
+    const actual = r.actual[i] || 0;
+    let body = "";
+    if (kind === "bid") {
+      body = `<div class="stepper"><button class="step-btn" data-action="step-bid" data-index="${i}" data-delta="-1">-</button><div class="step-value">${bid}</div><button class="step-btn" data-action="step-bid" data-index="${i}" data-delta="1">+</button></div>
+        <div class="tile-meta"><span>Exact score</span><b>${formatScore(scoreByMade(bid, true, state.game.scoringMode, r))}</b></div>`;
+    } else if (kind === "actual") {
+      const made = choice.value;
+      const projected = made === null ? 0 : scoreByMade(bid, made, state.game.scoringMode, r);
+      body = `<div class="made-choice-grid"><button class="made-choice yes ${made === true ? "active" : ""}" data-action="set-made" data-index="${i}" data-made="true" ${choice.yes || made === true && !choice.forced ? "" : "disabled"}>Made</button><button class="made-choice no ${made === false ? "active" : ""}" data-action="set-made" data-index="${i}" data-made="false" ${choice.no || made === false && !choice.forced ? "" : "disabled"}>Missed</button></div>
+        <div class="tile-meta"><span>Bid <b>${bid}</b></span><span class="status-pill ${made === true ? "ok" : made === false ? "bad" : "warn"}">${made === null ? "Choose" : made ? "Exact" : "Miss"}</span></div>
+        <div class="tile-meta"><span>Round score</span><b class="${made === null ? "zero" : scoreCls(projected)}">${made === null ? "-" : formatScore(projected)}</b></div>`;
+    } else if (kind === "edit") {
+      const made = choice.value;
+      const projected = made === null ? 0 : scoreByMade(bid, made, state.game.scoringMode, r);
+      body = `<div class="edit-controls">
+        <div class="edit-control"><label class="field-label">Bid</label><div class="stepper small"><button class="step-btn" data-action="step-edit-bid" data-index="${i}" data-delta="-1">-</button><div class="step-value">${bid}</div><button class="step-btn" data-action="step-edit-bid" data-index="${i}" data-delta="1">+</button></div></div>
+        <div class="edit-control actual"><label class="field-label">Made bid?</label><div class="made-choice-grid"><button class="made-choice yes ${made === true ? "active" : ""}" data-action="set-edit-made" data-index="${i}" data-made="true" ${choice.yes || made === true && !choice.forced ? "" : "disabled"}>Yes</button><button class="made-choice no ${made === false ? "active" : ""}" data-action="set-edit-made" data-index="${i}" data-made="false" ${choice.no || made === false && !choice.forced ? "" : "disabled"}>No</button></div></div>
+        </div><div class="tile-meta edit-score-meta"><span>Corrected score</span><b class="${made === null ? "zero" : scoreCls(projected)}">${made === null ? "-" : formatScore(projected)}</b></div>`;
+    }
+    return `<article class="player-tile ${kind === "edit" ? "correction-tile" : ""} ${isActive ? "active" : ""}" style="${themeStyle(i)}">
+      <button class="player-name" data-action="toggle-pin" data-index="${i}" style="width:100%; text-align:left;"><span class="avatar">${theme(i).symbol}</span><span style="min-width:0;"><span class="small">Player ${i+1}</span><span class="big">${esc(player.name)}</span></span></button>
+      ${body}
+      ${choice?.forced ? '<small class="forced-note">Set by trick count</small>' : ""}
+    </article>`;
+  }
+
+  function biddingScreen() {
+    const r = currentRound();
+    if (!r) return welcomeScreen();
+    const total = r.bids.reduce(function(a,b){ return a + Number(b || 0); }, 0);
+    const blocked = isBlockedBidTotal(total, r.cards);
+    const statusClass = blocked ? "neg" : total > r.cards ? "warn" : "pos";
+    return `<main class="page">${activeHeader(String(r.cards) + " Cards", "Bidding")}
+      <div class="wrap" style="margin-top:12px;">
+        <div class="player-grid">${state.game.players.map(function(p,i){ return playerTile(p, i, "bid"); }).join("")}</div>
+        <section class="glass action-panel">
+          <div class="total-box ${blocked ? "invalid" : ""}"><div><span>Bid total</span>${blocked ? `<div class="bid-rule-note bad">${esc(bidRuleText(total, r.cards))}</div>` : ""}</div><strong class="${statusClass}">${total}/${r.cards}</strong></div>
+          <button class="btn ${blocked ? "btn-red" : "btn-primary"}" data-action="start-round">${blocked ? "Fix Bids" : "Start Round"}</button>
+        </section>
+        ${state.error ? `<div class="error">${esc(state.error)}</div>` : ""}
+      </div>
+    </main>${bottomNav()}`;
+  }
+
+  function scoringScreen() {
+    const r = currentRound();
+    if (!r) return welcomeScreen();
+    const choices = roundChoices(r);
+    const marked = choices.filter(c => c.value !== null).length;
+    const allMarked = marked === state.game.players.length;
+    return `<main class="page">${activeHeader("Score", "Did they make it?")}
+      <div class="wrap" style="margin-top:12px;">
+        <div class="player-grid">${state.game.players.map(function(p,i){ return playerTile(p, i, "actual", choices[i]); }).join("")}</div>
+        <section class="glass action-panel">
+          <div class="total-box"><div><span>Players marked</span></div><strong class="${allMarked ? "pos" : "warn"}">${marked}/${state.game.players.length}</strong></div>
+          <button class="btn btn-gold" data-action="finalize-round">Finalize Score</button>
+        </section>
+        ${state.error ? `<div class="error">${esc(state.error)}</div>` : ""}
+      </div>
+    </main>${bottomNav()}`;
+  }
+
+  function resultScreen() {
+    const r = currentRound();
+    if (!r) return welcomeScreen();
+    return `<main class="page">${activeHeader("Result", "Round " + r.num + " complete")}
+      <div class="wrap" style="margin-top:12px;">
+        <section class="glass setup-card">
+          <div class="section-title"><div><p>Round scores</p><h2>Round ${r.num}</h2></div><button class="btn btn-dark" data-action="edit-round" data-index="${state.game.currentIndex}">Edit</button></div>
+          <div class="result-list">${state.game.players.map(function(p,i){ return `<div class="result-item" style="${themeStyle(i)}"><div><h3>${esc(p.name)}</h3><p>Bid ${r.bids[i]} / ${madeLabel(r, i)} / Total ${p.totalScore}</p></div><div class="score-number ${scoreCls(r.scores[i])}">${formatScore(r.scores[i])}</div></div>`; }).join("")}</div>
+        </section>
+        <div class="grid-4" style="margin-top:12px;">
+          <button class="btn btn-light" data-action="open-summary">Summary</button>
+          <button class="btn btn-light" data-action="open-share">Share</button>
+          ${state.game.isFinished ? "" : `<button class="btn btn-gold" data-action="finish-early">End Early</button>`}
+          <button class="btn btn-primary" data-action="next-round">${state.game.isFinished ? "Finish Match" : "Next Round"}</button>
+        </div>
+      </div>
+    </main>${bottomNav()}`;
+  }
+
+  function editScreen() {
+    const idx = state.editIndex == null ? state.game.currentIndex : state.editIndex;
+    const r = editRound();
+    const choices = roundChoices(r);
+    if (!r) return resultScreen();
+    const originalIndex = state.game.currentIndex;
+    state.game.currentIndex = idx;
+    const total = r.actual.reduce(function(a,b){ return a + Number(b || 0); }, 0);
+    const bidTotal = r.bids.reduce(function(a,b){ return a + Number(b || 0); }, 0);
+    const bidBlocked = isBlockedBidTotal(bidTotal, r.cards);
+    const html = `<main class="page">${header("Edit", "Fix round " + r.num, true)}
+      <div class="wrap pull-up">
+        <div class="glass round-info">${roundInfo()}</div>
+        <div style="height:10px"></div>
+        <section class="glass setup-card">
+          <div class="section-title"><div><p>Admin correction</p><h2>Change bid or result</h2></div><div style="display:grid; gap:4px; text-align:right;"><strong class="${choices.every(c => c.value !== null) ? "pos" : "warn"}">${choices.filter(c => c.value !== null).length}/${state.game.players.length} marked</strong><strong class="${bidBlocked ? "neg" : "pos"}">Bids ${bidTotal}/${r.cards}</strong></div></div>
+          <div class="correction-grid">${state.game.players.map(function(p,i){ return playerTile(p, i, "edit", choices[i]); }).join("")}</div>
+          ${state.error ? `<div class="error">${esc(state.error)}</div>` : ""}
+          <div class="grid-2" style="margin-top:12px;"><button class="btn btn-light" data-action="cancel-edit">Cancel</button><button class="btn btn-primary" data-action="save-edit">Save Correction</button></div>
+        </section>
+      </div>
+    </main>${bottomNav()}`;
+    state.game.currentIndex = originalIndex;
+    return html;
+  }
+
+  function finalScreen() {
+    const ranked = standings(state.game.players);
+    const champ = ranked[0] || { name: "", totalScore: 0 };
+    return `<main class="page no-nav safe-top safe-bottom"><div class="wrap" style="display:grid; gap:12px; padding-top:18px;">
+      <section class="felt welcome-table" style="border-radius:34px; padding:24px; box-shadow:0 24px 70px rgba(30,27,75,.26);">
+        <div class="on-felt" style="text-align:center;"><div style="font-size:4rem;">&#127942;</div><p class="eyebrow">${state.game.endedEarly ? "ENDED EARLY" : "FINAL LEADERBOARD"}</p><h1 style="margin:8px 0 0; font-family:Anton, Nunito Sans, sans-serif; font-size:clamp(2.9rem,12vw,6rem); line-height:.92; letter-spacing:.01em; font-weight:400; text-transform:uppercase;">LEADERBOARD</h1><p style="margin:10px 0 0; color:#fde68a; font-size:1.45rem; font-weight:900; text-transform:uppercase;">Champion: ${esc(champ.name)} - ${champ.totalScore} pts</p></div>
+      </section>
+      <section class="glass setup-card"><div class="section-title"><div><p>${completedCount(state.game)}/${state.game.rounds.length} rounds complete</p><h2>Final standings</h2></div></div><div class="final-rank">${ranked.map(function(p, i){ return `<div class="rank-row" style="${themeStyle(p.id)}"><div class="rank-badge" style="background:${theme(p.id).a};">#${i+1}</div><div><h3>${esc(p.name)}</h3><p>${i === 0 ? "First place" : i === 1 ? "Second place" : i === 2 ? "Third place" : "Final standing"}</p></div><div class="score-number ${scoreCls(p.totalScore)}">${p.totalScore}</div></div>`; }).join("")}</div>
+        <div class="grid-3" style="margin-top:12px;"><button class="btn btn-light" data-action="open-summary">Summary</button><button class="btn btn-light" data-action="open-share">Share</button><button class="btn btn-primary" data-action="new-match">New Match</button></div>
+      </section>
+    </div></main>`;
+  }
+
+  function rulesScreen() {
+    return `<main class="page no-nav">${header("Rules", "Quick guide", false)}<div class="wrap pull-up"><div class="grid-2">
+      ${[
+        ["Round patterns", "One to Max means 1, 2, 3 ... max, then repeats if the match is longer. Max to One means max, max-1 ... 1, then repeats. Custom accepts numbers and ranges like 10 or 1-10,10-1."],
+        ["Cards and decks", "The app supports 3 to 12 players. Cards per player are calculated automatically from player count and deck packs. Any leftover cards simply stay out as cats/kitty. Example: 5 players with 1 deck can play up to 10 cards each, leaving 2 cards out."],
+        ["Bid rule", "Total bids cannot equal the number of cards in the round. Example: in a 4-card round, 4/4 is not allowed; 3/4 or 5/4 is allowed because at least one player must miss."],
+        ["Trump or no trump", "At setup, choose with trump for suit rotation, or no trump for every round."],
+        ["Scoring", "After bids are entered, mark each player as Made or Missed. A made zero earns 10 in Regular or 0 in 0 Scoring. A missed zero costs 10 in both. Other bids gain or lose 10 per trick bid. Tap 2X during bidding or scoring to double gains and losses for that round."],
+        ["Fix mistakes", "After submitting a round, use Edit from Result or Summary to correct bids and tricks. Totals recalculate automatically."],
+        ["Phone score view", "Snapshot links work immediately. True live phone updates need Firebase Realtime Database config; the admin phone writes the score and player phones listen to the same match code." ],
+        ["Finish early", "Use Finish from the bottom bar or Result screen to stop a long match and show the leaderboard without deleting the scores." ]
+      ].map(function(item){ return `<section class="glass setup-card"><h2 style="margin:0 0 8px; font-weight:900; letter-spacing:-.04em;">${esc(item[0])}</h2><p class="help" style="margin:0; font-size:.95rem;">${esc(item[1])}</p></section>`; }).join("")}
+      </div></div></main>`;
+  }
+
+  function summaryModal() {
+    if (state.modal !== "summary" || !state.game) return "";
+    const rowsMobile = state.game.rounds.map(function(r, idx){
+      return `<div class="card" style="border-radius:22px; padding:12px; ${idx === state.game.currentIndex ? "background:#eef2ff;" : ""}">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;"><div><p class="field-label" style="margin:0 0 3px;">Round ${r.num}${r.doublePoints ? " · 2X" : ""}</p><h3 style="margin:0; font-weight:900;">${r.cards} cards ${esc((r.trump || NO_TRUMP).icon)}</h3></div>${r.status === "completed" ? `<button class="btn btn-dark" data-action="edit-round" data-index="${idx}" style="min-height:38px; padding:8px 10px; border-radius:14px;">Edit</button>` : `<span class="status-pill warn">Open</span>`}</div>
+        <div style="display:grid; gap:6px; margin-top:10px;">${state.game.players.map(function(p,i){ return `<div style="display:flex; justify-content:space-between; gap:8px; padding:8px; border-radius:14px; background:#f8fafc;"><b style="text-transform:uppercase; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(p.name)}</b>${r.status === "completed" ? `<span class="${scoreCls(r.scores[i])}" style="font-weight:900;">${r.bids[i]} / ${madeShort(r, i)} ${formatScore(r.scores[i])}</span>` : `<span style="color:#94a3b8; font-weight:900;">-</span>`}</div>`; }).join("")}</div>
+      </div>`;
+    }).join("");
+    const tableRows = state.game.rounds.map(function(r, idx){
+      return `<tr style="${idx === state.game.currentIndex ? "background:#eef2ff;" : "background:white;"}"><td><b>R${r.num}${r.doublePoints ? " · 2X" : ""}</b></td><td>${r.cards}</td><td style="font-size:1.25rem; color:${(r.trump || NO_TRUMP).color};">${esc((r.trump || NO_TRUMP).icon)}</td>${state.game.players.map(function(p,i){ return `<td>${r.status === "completed" ? `<div style="font-size:.72rem; color:#64748b; font-weight:900;">${r.bids[i]} / ${madeShort(r, i)}</div><div class="${scoreCls(r.scores[i])}" style="font-weight:900;">${formatScore(r.scores[i])}</div>` : `<span style="color:#94a3b8; font-weight:900;">-</span>`}</td>`; }).join("")}<td>${r.status === "completed" ? `<button class="btn btn-dark" data-action="edit-round" data-index="${idx}" style="min-height:36px; padding:7px 10px; border-radius:12px;">Edit</button>` : "-"}</td></tr>`;
+    }).join("");
+    return `<div class="modal-backdrop"><div class="modal"><div class="modal-head felt"><div class="modal-head-row"><div><p class="eyebrow">Scoreboard</p><h2 class="modal-title">MATCH SUMMARY</h2></div><button class="close" data-action="close-modal" aria-label="Close">&times;</button></div></div><div class="modal-body">
+      <div class="card" style="border-radius:22px; padding:12px; margin-bottom:10px;"><div class="section-title"><div><p>Totals</p><h2>Standings</h2></div><button class="btn btn-light" data-action="copy-summary" style="min-height:40px; padding:8px 12px;">Copy</button></div>${scoreStrip()}</div>
+      <div class="summary-desktop"><table style="min-width:${Math.max(760, 300 + state.game.players.length * 118)}px;"><thead><tr><th>Round</th><th>Cards</th><th>Trump</th>${state.game.players.map(function(p){ return `<th>${esc(p.name)}</th>`; }).join("")}<th>Edit</th></tr></thead><tbody>${tableRows}</tbody></table></div>
+    </div></div></div>`;
+  }
+
+  function shareModal() {
+    if (state.modal !== "share" || !state.game) return "";
+    const ready = firebaseConfigured();
+    const code = sanitizeCode(state.shareCode || state.sync.matchCode || generateMatchCode());
+    const playerButtons = state.game.players.map(function(p,i){ return `<button class="choice" data-action="copy-player-snapshot" data-index="${i}"><strong>${esc(p.name)}</strong><span>Copy personal snapshot</span></button>`; }).join("");
+    const liveButtons = state.game.players.map(function(p,i){ return `<button class="choice" data-action="copy-player-live" data-index="${i}" ${ready ? "" : "disabled"}><strong>${esc(p.name)}</strong><span>${ready ? "Copy personal live link" : "Needs Firebase"}</span></button>`; }).join("");
+    return `<div class="modal-backdrop"><div class="modal" style="max-width:900px;"><div class="modal-head felt"><div class="modal-head-row"><div><p class="eyebrow">PHONES & IPADS</p><h2 class="modal-title">SHARE SCORES</h2></div><button class="close" data-action="close-modal" aria-label="Close">&times;</button></div></div><div class="modal-body">
+      <div class="share-grid">
+        <section class="share-card"><h3>SNAPSHOT LINKS</h3><p>Works immediately on GitHub Pages. It is read-only; copy a new snapshot after later rounds if players need an updated link.</p><button class="btn btn-primary btn-full" data-action="copy-snapshot">COPY MATCH SNAPSHOT</button><div class="choice-grid" style="margin-top:10px;">${playerButtons}</div></section>
+        <section class="share-card"><h3>TEXT SUMMARY</h3><p>Best for WhatsApp or a group chat. It includes current standings and completed rounds.</p><button class="btn btn-dark btn-full" data-action="copy-summary">COPY TEXT SUMMARY</button></section>
+        <section class="share-card" style="background:#0f172a; color:white;"><h3>LIVE SYNC</h3><p style="color:rgba(255,255,255,.72);">True live updates need Firebase config pasted inside this HTML file. Status: ${ready ? "Ready" : "Needs Firebase"}.</p><input class="input" style="background:rgba(255,255,255,.08); color:white; border-color:rgba(255,255,255,.18); text-transform:uppercase;" data-input="shareCode" value="${esc(code)}"><div style="height:8px"></div><button class="btn btn-gold btn-full" data-action="start-live">START LIVE</button><p style="color:rgba(255,255,255,.72); margin-top:10px;">${esc(state.sync.status)} ${state.sync.error ? "- " + esc(state.sync.error) : ""}</p><div class="choice-grid" style="margin-top:10px;">${liveButtons}</div></section>
+        <section class="share-card"><h3>BEST FREE SETUP</h3><p>Use GitHub Pages for the file and Firebase Realtime Database Spark for live scores. For only a table of players, the free limits are usually more than enough.</p><button class="btn btn-light btn-full" data-action="copy-live">COPY LIVE MATCH LINK</button></section>
+      </div>
+    </div></div></div>`;
+  }
+
+  function viewerScreen() {
+    if (!state.game) {
+      return `<main class="page no-nav safe-top safe-bottom"><div class="wrap" style="display:grid; place-items:center; min-height:80vh;"><section class="glass setup-card" style="max-width:520px; text-align:center;"><h1 style="margin:0 0 8px; font-size:2rem; font-weight:900;">Waiting for scores</h1><p class="help">${esc(state.sync.error || state.sync.status || "This viewer link has no match data yet.")}</p></section></div></main>`;
+    }
+    const cr = currentRound();
+    const pinned = state.pinned != null ? state.game.players[state.pinned] : null;
+    return `<main class="page no-nav">${header("Score View", state.viewerKind === "live" ? state.sync.status : "Snapshot", false)}<div class="wrap pull-up">
+      <div class="glass round-info">${roundInfo()}</div><div style="height:10px"></div>${scoreStrip()}
+      ${pinned ? `<section class="player-tile active" style="${themeStyle(pinned.id)} margin-top:10px;"><div class="player-name"><span class="avatar">${theme(pinned.id).symbol}</span><span><span class="small">Pinned player</span><span class="big" style="font-size:1.35rem;">${esc(pinned.name)}</span></span></div><div class="total-box"><span>Total score</span><strong>${pinned.totalScore}</strong></div></section>` : ""}
+      <div class="grid-2" style="margin-top:12px;"><section class="glass setup-card"><div class="section-title"><div><p>Players</p><h2>Standings</h2></div></div><div class="final-rank">${standings(state.game.players).map(function(p, i){ return `<div class="rank-row" style="${themeStyle(p.id)}"><div class="rank-badge" style="background:${theme(p.id).a};">#${i+1}</div><div><h3>${esc(p.name)}</h3><p>Player ${p.id + 1}</p></div><div class="score-number ${scoreCls(p.totalScore)}">${p.totalScore}</div></div>`; }).join("")}</div></section><section class="glass setup-card"><div class="section-title"><div><p>${completedCount(state.game)}/${state.game.rounds.length} done</p><h2>Rounds</h2></div></div><div class="summary-mobile" style="max-height:580px; overflow:auto;">${state.game.rounds.map(function(r){ return `<div class="card" style="border-radius:20px; padding:10px;"><div style="display:flex; justify-content:space-between; gap:8px;"><b>R${r.num} - ${r.cards} cards</b><b style="color:${(r.trump || NO_TRUMP).color};">${esc((r.trump || NO_TRUMP).icon)}</b></div>${state.game.players.map(function(p,i){ return `<div style="display:flex; justify-content:space-between; gap:8px; margin-top:6px; font-size:.84rem;"><span>${esc(p.name)}</span>${r.status === "completed" ? `<b class="${scoreCls(r.scores[i])}">${r.bids[i]} / ${madeShort(r, i)} ${formatScore(r.scores[i])}</b>` : `<b style="color:#94a3b8;">-</b>`}</div>`; }).join("")}</div>`; }).join("")}</div></section></div>
+    </div></main>`;
+  }
+
+  function bottomNav() {
+    if (!state.game || state.viewerKind || ["welcome", "setup", "rules", "final"].includes(state.screen)) return "";
+    return `<nav class="bottom-nav safe-bottom"><div class="nav-grid"><button class="nav-btn ${["bidding","scoring","result"].includes(state.screen) ? "active" : ""}" data-action="go-current"><span class="ico">\u25ce</span>Current</button><button class="nav-btn" data-action="open-summary"><span class="ico">\u2630</span>Summary</button><button class="nav-btn" data-action="open-share"><span class="ico">\u21aa</span>Share</button><button class="nav-btn danger" data-action="finish-early"><span class="ico">\u2691</span>Finish</button></div></nav>`;
+  }
+
+  function makeSummaryText() {
+    if (!state.game) return "";
+    const cr = currentRound();
+    const lines = [];
+    lines.push("Kachuful Match Summary · " + (state.game.scoringMode === "zero" ? "0 Scoring" : "Regular"));
+    lines.push("Status: " + (state.game.endedEarly ? "Finished early" : state.game.isFinished ? "Finished" : "In progress"));
+    lines.push("Round " + (state.game.currentIndex + 1) + "/" + state.game.rounds.length + (cr ? " - " + cr.cards + " cards - " + (cr.trump || NO_TRUMP).name : ""));
+    lines.push("");
+    lines.push("Standings:");
+    standings(state.game.players).forEach(function(p, i){ lines.push((i+1) + ". " + p.name + ": " + p.totalScore); });
+    lines.push("");
+    lines.push("Completed rounds:");
+    state.game.rounds.filter(function(r){ return r.status === "completed"; }).forEach(function(r){
+      const row = state.game.players.map(function(p, i){ return p.name + " bid " + r.bids[i] + " - " + madeLabel(r, i) + " " + formatScore(r.scores[i]); }).join(" | ");
+      lines.push("R" + r.num + (r.doublePoints ? " · 2X" : "") + " (" + r.cards + " cards, " + (r.trump || NO_TRUMP).name + "): " + row);
+    });
+    return lines.join("\n");
+  }
+
+  function render() {
+    let html = "";
+    if (state.screen === "welcome") html = welcomeScreen();
+    else if (state.screen === "setup") html = setupScreen();
+    else if (state.screen === "rules") html = rulesScreen();
+    else if (state.screen === "bidding" && state.game) html = biddingScreen();
+    else if (state.screen === "scoring" && state.game) html = scoringScreen();
+    else if (state.screen === "result" && state.game) html = resultScreen();
+    else if (state.screen === "edit" && state.game) html = editScreen();
+    else if (state.screen === "final" && state.game) html = finalScreen();
+    else if (state.screen === "viewer") html = viewerScreen();
+    else html = welcomeScreen();
+    html += summaryModal() + shareModal();
+    app.innerHTML = html;
+  }
+
+  function startMatch() {
+    const config = normalizeConfig(state.config);
+    const seq = buildSequence(config);
+    const players = config.playerNames.map(function(name, i){ return { id: i, name: String(name || "").trim() || "Player " + (i + 1), colorIndex: config.playerColors[i], totalScore: 0 }; });
+    const rounds = seq.map(function(cards, i){
+      const trump = config.trumpMode === "with" ? SUITS[i % SUITS.length] : NO_TRUMP;
+      return { num: i + 1, cards: cards, trump: trump, bids: Array(config.playerCount).fill(0), actual: Array(config.playerCount).fill(null), made: Array(config.playerCount).fill(null), scores: Array(config.playerCount).fill(0), status: "bidding" };
+    });
+    state.config = config;
+    state.game = { scoringMode: config.scoringMode, players: players, rounds: rounds, currentIndex: 0, isFinished: false };
+    state.pinned = null;
+    state.error = "";
+    state.screen = "bidding";
+    commit();
+  }
+
+  function adjustSetup(field, delta) {
+    const c = normalizeConfig(state.config);
+    if (field === "playerCount") {
+      c.playerCount = clamp(c.playerCount + delta, MIN_PLAYERS, MAX_PLAYERS);
+      while (c.playerNames.length < c.playerCount) c.playerNames.push("Player " + (c.playerNames.length + 1));
+      c.playerNames = c.playerNames.slice(0, c.playerCount);
+      c.cardsPerPlayer = maxCardsFor(c);
+    } else if (field === "totalRounds") {
+      c.totalRounds = clamp(c.totalRounds + delta, 1, 300);
+    }
+    state.config = normalizeConfig(c);
+    commit();
+  }
+
+  function stepRoundArray(kind, idx, delta) {
+    const r = state.screen === "edit" ? editRound() : currentRound();
+    if (!r) return;
+    const arrName = kind === "bid" ? "bids" : "actual";
+    let next = clamp((r[arrName][idx] || 0) + delta, 0, r.cards);
+    if (kind === "bid" && idx === state.game.players.length - 1) {
+      const sumExLast = r.bids.slice(0, -1).reduce(function(a,b){ return a + Number(b || 0); }, 0);
+      const restricted = r.cards - sumExLast;
+      if (next === restricted) {
+        next = delta > 0 ? clamp(next + 1, 0, r.cards) : clamp(next - 1, 0, r.cards);
+        if (next === restricted) return;
+      }
+    }
+    r[arrName][idx] = next;
+    state.error = "";
+    commit();
+  }
+
+  function setMade(idx, value) {
+    const r = state.screen === "edit" ? editRound() : currentRound();
+    if (!r || roundChoices(r)[idx]?.forced) return;
+    const marks = r.bids.map((_, i) => r.made?.[i] ?? null);
+    // Tap a manual choice again to clear it, including an invalid legacy entry.
+    marks[idx] = marks[idx] === value ? null : value;
+    if (marks[idx] !== null && !fitsRound(r, marks)) return;
+    r.made = marks;
+    state.error = "";
+    commit();
+  }
+
+  function startRound() {
+    const r = currentRound();
+    const total = r.bids.reduce(function(a,b){ return a + Number(b || 0); }, 0);
+    if (isBlockedBidTotal(total, r.cards)) {
+      state.error = "Bid total cannot equal " + r.cards + ". Someone has to be under or over, so change the total to " + (r.cards - 1) + " or less, or " + (r.cards + 1) + " or more.";
+      render();
+      return;
+    }
+    if (!Array.isArray(r.made) || r.made.length !== state.game.players.length) r.made = Array(state.game.players.length).fill(null);
+    r.status = "playing";
+    state.screen = "scoring";
+    state.error = "";
+    commit();
+  }
+
+  function resolveResults(round) {
+    const results = roundChoices(round).map(c => c.value);
+    if (!fitsRound(round, results)) {
+      state.error = "These results cannot add up to " + round.cards + " tricks. Tap a selected result to clear it.";
+    } else if (results.includes(null)) {
+      state.error = "Choose Made or Missed for each remaining player.";
+    } else {
+      round.inputMarks = round.made.slice();
+      round.made = results;
+      return true;
+    }
+    render();
+    return false;
+  }
+
+  function finalizeRound() {
+    const r = currentRound();
+    if (!resolveResults(r)) return;
+    r.actual = r.bids.map(function(bid, i){ return madeValue(r, i) ? Number(bid || 0) : null; });
+    r.status = "completed";
+    updateGame(state.game);
+    state.screen = "result";
+    state.error = "";
+    commit();
+  }
+
+  function saveEdit() {
+    const idx = state.editIndex == null ? state.game.currentIndex : state.editIndex;
+    const r = editRound();
+    const total = r.actual.reduce(function(a,b){ return a + Number(b || 0); }, 0);
+    const bidTotal = r.bids.reduce(function(a,b){ return a + Number(b || 0); }, 0);
+    if (isBlockedBidTotal(bidTotal, r.cards)) {
+      state.error = "Bid total cannot equal " + r.cards + ". Change the bids to " + (r.cards - 1) + " or less, or " + (r.cards + 1) + " or more.";
+      render();
+      return;
+    }
+    if (!resolveResults(r)) return;
+    r.actual = r.bids.map(function(bid, i){ return madeValue(r, i) ? Number(bid || 0) : null; });
+    r.status = "completed";
+    state.game.rounds[idx] = r;
+    state.editDraft = null;
+    updateGame(state.game);
+    state.screen = state.editReturn || "result";
+    state.editIndex = null;
+    state.error = "";
+    commit();
+  }
+
+  function nextRound() {
+    if (state.game.isFinished || state.game.currentIndex >= state.game.rounds.length - 1) {
+      state.game.isFinished = true;
+      state.screen = "final";
+    } else {
+      state.game.currentIndex += 1;
+      state.screen = "bidding";
+    }
+    state.error = "";
+    commit();
+  }
+
+  function finishEarly() {
+    if (!state.game) return;
+    if (confirm("Finish this match now and show the leaderboard? Scores will not be deleted.")) {
+      state.game.isFinished = true;
+      state.game.endedEarly = true;
+      state.screen = "final";
+      state.modal = null;
+      state.error = "";
+      commit();
+    }
+  }
+
+  function endMatch() {
+    if (confirm("End this match and clear progress on this device?")) {
+      state.game = null;
+      state.screen = "welcome";
+      state.modal = null;
+      state.pinned = null;
+      state.sync = { enabled: false, role: null, matchCode: "", status: "Offline", error: "" };
+      stopLiveListener();
+      clearLocal();
+      render();
+    }
+  }
+
+  function newMatch() {
+    state.game = null;
+    state.screen = "setup";
+    state.modal = null;
+    state.pinned = null;
+    state.error = "";
+    state.sync = { enabled: false, role: null, matchCode: "", status: "Offline", error: "" };
+    stopLiveListener();
+    clearLocal();
+    render();
+  }
+
+  document.addEventListener("click", function(e){
+    const screenBtn = e.target.closest("[data-screen]");
+    if (screenBtn) {
+      state.screen = screenBtn.getAttribute("data-screen");
+      state.modal = null;
+      state.error = "";
+      if (state.screen === "setup") state.config = normalizeConfig(state.config);
+      commit();
+      return;
+    }
+    const btn = e.target.closest("[data-action]");
+    if (!btn) return;
+    const action = btn.getAttribute("data-action");
+    const idx = btn.hasAttribute("data-index") ? Number(btn.getAttribute("data-index")) : null;
+    const delta = btn.hasAttribute("data-delta") ? Number(btn.getAttribute("data-delta")) : 0;
+
+    if (action === "setup-step") adjustSetup(btn.getAttribute("data-field"), delta);
+    else if (action === "scoring-mode") { state.config.scoringMode = btn.dataset.value; commit(); }
+    else if (action === "double-round" && !state.viewerKind && ["bidding", "scoring"].includes(state.screen)) {
+      const round = currentRound();
+      round.doublePoints = !round.doublePoints;
+      commit();
+    }
+    else if (action === "select-decks") { const c = normalizeConfig(state.config); c.deckCount = Number(btn.getAttribute("data-value")); c.cardsPerPlayer = maxCardsFor(c); state.config = normalizeConfig(c); commit(); }
+    else if (action === "select-trump") { state.config.trumpMode = btn.getAttribute("data-value"); state.config = normalizeConfig(state.config); commit(); }
+    else if (action === "set-player-color") {
+      const c = normalizeConfig(state.config);
+      const colorIdx = clamp(Number(btn.getAttribute("data-color")), 0, THEMES.length - 1);
+      if (idx != null) c.playerColors[idx] = colorIdx;
+      state.config = normalizeConfig(c);
+      commit();
+    }
+    else if (action === "select-round-mode") { state.config.roundMode = btn.getAttribute("data-value"); state.config = normalizeConfig(state.config); commit(); }
+    else if (action === "start-match") startMatch();
+    else if (action === "go-current") { state.screen = currentScreenForGame(); state.modal = null; state.error = ""; commit(); }
+    else if (action === "open-summary") { if (state.game) { state.modal = "summary"; render(); } }
+    else if (action === "open-share") { if (state.game) { state.modal = "share"; render(); } }
+    else if (action === "close-modal") { state.modal = null; render(); }
+    else if (action === "toggle-pin") { state.pinned = state.pinned === idx ? null : idx; commit(); }
+    else if (action === "step-bid") stepRoundArray("bid", idx, delta);
+    else if (action === "step-actual") stepRoundArray("actual", idx, delta);
+    else if (action === "step-edit-bid") stepRoundArray("bid", idx, delta);
+    else if (action === "step-edit-actual") stepRoundArray("actual", idx, delta);
+    else if (action === "set-made" || action === "set-edit-made") setMade(idx, btn.getAttribute("data-made") === "true");
+    else if (action === "start-round") startRound();
+    else if (action === "finalize-round") finalizeRound();
+    else if (action === "next-round") nextRound();
+    else if (action === "finish-early") finishEarly();
+    else if (action === "edit-round") { state.editDraft = null; state.editIndex = idx; state.editReturn = state.screen === "edit" ? "result" : state.screen; state.modal = null; state.screen = "edit"; state.error = ""; commit(); }
+    else if (action === "cancel-edit") { state.editDraft = null; state.screen = state.editReturn || "result"; state.editIndex = null; state.error = ""; commit(); }
+    else if (action === "save-edit") saveEdit();
+    else if (action === "end-match") endMatch();
+    else if (action === "new-match") newMatch();
+    else if (action === "copy-summary") copyText(makeSummaryText(), "Summary");
+    else if (action === "copy-snapshot") { const link = snapshotLink(); if (link.length > 7500) alert("This match link is very long because it contains the whole match. For long games, live sync or text summary is better."); copyText(link, "Snapshot link"); }
+    else if (action === "copy-player-snapshot") copyText(snapshotLink(idx), state.game.players[idx].name + " snapshot");
+    else if (action === "copy-live") copyText(liveLink(state.shareCode, null), "Live link");
+    else if (action === "copy-player-live") copyText(liveLink(state.shareCode, idx), state.game.players[idx].name + " live link");
+    else if (action === "start-live") {
+      if (!firebaseConfigured()) { alert("Firebase is not configured yet. Snapshot links and text summaries still work. Paste Firebase config into FIREBASE_CONFIG to enable live links."); return; }
+      const code = sanitizeCode(state.shareCode || generateMatchCode());
+      state.shareCode = code;
+      state.sync = { enabled: true, role: "admin", matchCode: code, status: "Starting live sync", error: "" };
+      scheduleLiveSync();
+      render();
+    }
+  });
+
+  document.addEventListener("input", function(e){
+    const input = e.target.closest("[data-input]");
+    if (!input) return;
+    const type = input.getAttribute("data-input");
+    if (type === "playerName") {
+      const idx = Number(input.getAttribute("data-index"));
+      const c = normalizeConfig(state.config);
+      c.playerNames[idx] = input.value;
+      state.config = c;
+      saveLocal();
+    } else if (type === "customSequence") {
+      state.config.customSequence = input.value;
+      state.config.roundMode = "custom";
+      saveLocal();
+    } else if (type === "shareCode") {
+      state.shareCode = sanitizeCode(input.value);
+    }
+  });
+
+  function init() {
+    const params = new URLSearchParams(window.location.search);
+    const view = params.get("view");
+    const match = sanitizeCode(params.get("match"));
+    const player = params.get("player");
+    if (player != null && !Number.isNaN(Number(player))) state.pinned = Number(player);
+
+    if (view) {
+      try {
+        const snap = decodeSnapshot(view);
+        state.config = normalizeConfig(snap.config || snap.gameConfig || DEFAULT_CONFIG);
+        state.game = recalcGame(snap.game || snap.gameState || null);
+        state.viewerKind = "snapshot";
+        state.screen = "viewer";
+      } catch (error) {
+        state.viewerKind = "snapshot";
+        state.screen = "viewer";
+        state.sync.error = "Could not open this snapshot link.";
+      }
+      render();
+      return;
+    }
+
+    if (match) {
+      state.viewerKind = "live";
+      state.screen = "viewer";
+      state.sync = { enabled: true, role: "viewer", matchCode: match, status: "Connecting", error: "" };
+      render();
+      listenLive(match);
+      return;
+    }
+
+    const keys = [STORAGE_KEY].concat(OLD_KEYS);
+    for (let i = 0; i < keys.length; i++) {
+      const raw = localStorage.getItem(keys[i]);
+      if (!raw) continue;
+      try {
+        const parsed = JSON.parse(raw);
+        state.config = normalizeConfig(parsed.config || parsed.gameConfig || DEFAULT_CONFIG);
+        state.game = recalcGame(parsed.game || parsed.gameState || null);
+        state.screen = parsed.screen || (state.game ? currentScreenForGame() : "welcome");
+        break;
+      } catch (err) {}
+    }
+    render();
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
